@@ -1,0 +1,38 @@
+import { api } from './api';
+import { Task } from '../types';
+
+export const taskService = {
+  async getAll(userId: number): Promise<Task[]> {
+    const response = await api.get(`/tasks/${userId}`);
+    return response.data;
+  },
+
+  async create(title: string, description: string, teamId: number, userId: number): Promise<Task> {
+    const response = await api.post('/tasks', { title, description, teamId, userId });
+    return response.data;
+  },
+
+  async update(id: number, userId: number, data: { title?: string; description?: string; priority?: string }): Promise<Task> {
+    const response = await api.put(`/tasks/${id}`, { userId, ...data });
+    return response.data;
+  },
+
+  async delete(id: number, userId: number): Promise<void> {
+    await api.delete(`/tasks/${id}`, { data: { userId } });
+  },
+
+  async changeState(taskId: number, estado: string, usuarioId: number): Promise<Task> {
+    const response = await api.put(`/tareas/${taskId}/estado`, { estado, usuarioId });
+    return response.data;
+  },
+
+  async getStateHistory(taskId: number): Promise<any[]> {
+    const response = await api.get(`/tareas/${taskId}/historial`);
+    return response.data;
+  },
+
+  async getByState(equipoId: number, estado: string): Promise<Task[]> {
+    const response = await api.get(`/equipos/${equipoId}/tareas/${estado}`);
+    return response.data;
+  }
+};

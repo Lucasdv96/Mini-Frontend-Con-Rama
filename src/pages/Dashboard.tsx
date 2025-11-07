@@ -1,70 +1,105 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import KanbanBoard from '../components/KanbanBoard';
+import TeamManagement from '../components/TeamManagement';
+import TaskForm from '../components/TaskForm';
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
+  const [activeSection, setActiveSection] = useState<'kanban' | 'teams' | 'createTask'>('kanban');
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <header style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        marginBottom: '20px',
-        paddingBottom: '10px',
-        borderBottom: '1px solid #ccc'
+        padding: '20px',
+        backgroundColor: 'white',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
-        <h1>Mini Kanban - Dashboard</h1>
-        <div>
-          <span>Hola, {user?.name} </span>
+        <h1 style={{ margin: 0, color: '#333' }}>🚀 Mini Kanban</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <span style={{ color: '#666' }}>Hola, <strong>{user?.name}</strong></span>
           <button 
             onClick={logout}
             style={{ 
-              marginLeft: '10px', 
-              padding: '5px 10px',
+              padding: '8px 16px',
               backgroundColor: '#dc3545',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              fontSize: '14px'
             }}
           >
             Cerrar Sesión
           </button>
         </div>
       </header>
-      
-      <div>
-        <h2>Bienvenido al sistema Kanban</h2>
-        <p>Esta es la vista principal. Aquí implementaremos el tablero Kanban.</p>
-        
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '20px',
-          marginTop: '30px'
-        }}>
-          <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-            <h3>PENDIENTE</h3>
-            <p>Tareas pendientes aparecerán aquí</p>
-          </div>
-          
-          <div style={{ padding: '15px', backgroundColor: '#fff3cd', borderRadius: '8px' }}>
-            <h3>EN CURSO</h3>
-            <p>Tareas en progreso aparecerán aquí</p>
-          </div>
-          
-          <div style={{ padding: '15px', backgroundColor: '#d1ecf1', borderRadius: '8px' }}>
-            <h3>FINALIZADA</h3>
-            <p>Tareas completadas aparecerán aquí</p>
-          </div>
-          
-          <div style={{ padding: '15px', backgroundColor: '#f8d7da', borderRadius: '8px' }}>
-            <h3>CANCELADA</h3>
-            <p>Tareas canceladas aparecerán aquí</p>
-          </div>
+
+      {/* Navegación */}
+      <nav style={{ 
+        backgroundColor: 'white', 
+        padding: '15px 20px',
+        borderBottom: '1px solid #e0e0e0',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => setActiveSection('kanban')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: activeSection === 'kanban' ? '#007bff' : 'transparent',
+              color: activeSection === 'kanban' ? 'white' : '#007bff',
+              border: '1px solid #007bff',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            📋 Tablero Kanban
+          </button>
+          <button
+            onClick={() => setActiveSection('teams')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: activeSection === 'teams' ? '#007bff' : 'transparent',
+              color: activeSection === 'teams' ? 'white' : '#007bff',
+              border: '1px solid #007bff',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            👥 Equipos
+          </button>
+          <button
+            onClick={() => setActiveSection('createTask')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: activeSection === 'createTask' ? '#007bff' : 'transparent',
+              color: activeSection === 'createTask' ? 'white' : '#007bff',
+              border: '1px solid #007bff',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            ➕ Crear Tarea
+          </button>
         </div>
-      </div>
+      </nav>
+
+      {/* Contenido principal */}
+      <main style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+        {activeSection === 'kanban' && <KanbanBoard />}
+        {activeSection === 'teams' && <TeamManagement />}
+        {activeSection === 'createTask' && <TaskForm />}
+      </main>
     </div>
   );
 };
