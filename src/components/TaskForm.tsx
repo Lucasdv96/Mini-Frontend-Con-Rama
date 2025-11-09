@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Team } from '../types';
+import { Team, Etiqueta, Membership } from '../types';
 import { teamService } from '../services/teamService';
 import { taskService } from '../services/taskService';
+import { etiquetaService } from '../services/etiquetaService';
 import { useAuth } from '../contexts/AuthContext';
 
 const TaskForm: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
+  const [priority, setPriority] = useState<'alta' | 'media' | 'baja'>('media');
+  const [dueDate, setDueDate] = useState('');
+  const [selectedEtiquetas, setSelectedEtiquetas] = useState<number[]>([]);
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
+  const [newEtiquetaNombre, setNewEtiquetaNombre] = useState('');
+  const [newEtiquetaColor, setNewEtiquetaColor] = useState('#FF5733');
+  const [showNewEtiqueta, setShowNewEtiqueta] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -15,24 +23,40 @@ const TaskForm: React.FC = () => {
 
   useEffect(() => {
     loadTeams();
+    loadEtiquetas();
   }, []);
 
   const loadTeams = async () => {
-    if (!user) return;
+  if (!user) return;
 
+  try {
+    setLoading(true);
+    const myTeams = await teamService.getMyTeams(user.id);
+    
+    // Cambio importante: Mostrar todos los equipos donde el usuario es miembro
+    // const myTeams = teamsData.filter(team => 
+    //   team.memberships?.some((m: Membership) => m.id === user.id)
+    // );
+    
+  
+    setTeams(myTeams);
+    
+    if (myTeams.length > 0) {
+      setSelectedTeam(myTeams[0].id);
+    }
+  } catch (err: any) {
+    console.error('Error loading teams:', err);
+  } finally {
+    setLoading(false);
+  }
+  };
+
+  const loadEtiquetas = async () => {
     try {
-      setLoading(true);
-      const teamsData = await teamService.getAll();
-      setTeams(teamsData);
-      
-      // Seleccionar el primer equipo por defecto si hay equipos
-      if (teamsData.length > 0) {
-        setSelectedTeam(teamsData[0].id);
-      }
+      const etiquetasData = await etiquetaService.getAll();
+      setEtiquetas(etiquetasData);
     } catch (err: any) {
-      console.error('Error loading teams:', err);
-    } finally {
-      setLoading(false);
+      console.error('Error loading etiquetas:', err);
     }
   };
 
@@ -42,11 +66,41 @@ const TaskForm: React.FC = () => {
 
     try {
       setSubmitLoading(true);
-      await taskService.create(title, description, selectedTeam, user.id);
       
+      // Primero, si hay una nueva etiqueta, crearla
+      let etiquetasIds = [...selectedEtiquetas];
+      if (showNewEtiqueta && newEtiquetaNombre.trim()) {
+        try {
+          const nuevaEtiqueta = await etiquetaService.create(newEtiquetaNombre, newEtiquetaColor);
+          etiquetasIds.push(nuevaEtiqueta.id);
+        } catch (err: any) {
+          console.error('Error creando etiqueta:', err);
+          // Continuar sin la nueva etiqueta si hay error
+        }
+      }
+
+      // Crear la tarea
+      const taskData = {
+        title,
+        description,
+        teamId: selectedTeam,
+        userId: user.id,
+        priority,
+        dueDate: dueDate || undefined,
+        etiquetasIds: etiquetasIds.length > 0 ? etiquetasIds : undefined
+      };
+
+      await taskService.create(taskData);
+
       // Limpiar formulario
       setTitle('');
       setDescription('');
+      setPriority('media');
+      setDueDate('');
+      setSelectedEtiquetas([]);
+      setNewEtiquetaNombre('');
+      setNewEtiquetaColor('#FF5733');
+      setShowNewEtiqueta(false);
       
       alert('✅ Tarea creada exitosamente!');
     } catch (err: any) {
@@ -54,6 +108,23 @@ const TaskForm: React.FC = () => {
       console.error('Error creating task:', err);
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  const toggleEtiqueta = (etiquetaId: number) => {
+    setSelectedEtiquetas(prev =>
+      prev.includes(etiquetaId)
+        ? prev.filter(id => id !== etiquetaId)
+        : [...prev, etiquetaId]
+    );
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'alta': return '#dc3545';
+      case 'media': return '#ffc107';
+      case 'baja': return '#28a745';
+      default: return '#6c757d';
     }
   };
 
@@ -71,7 +142,7 @@ const TaskForm: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '700px', margin: '0 auto' }}>
       <h2>Crear Nueva Tarea</h2>
       
       <form onSubmit={handleSubmit} style={{ 
@@ -119,8 +190,56 @@ const TaskForm: React.FC = () => {
             }}
           />
         </div>
+
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: '1fr 1fr', 
+          gap: '20px',
+          marginBottom: '20px'
+        }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+              Prioridad: *
+            </label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as 'alta' | 'media' | 'baja')}
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                border: '1px solid #ddd',
+                borderRadius: '6px',
+                fontSize: '16px',
+                backgroundColor: 'white'
+              }}
+            >
+              <option value="baja">🟢 Baja</option>
+              <option value="media">🟡 Media</option>
+              <option value="alta">🔴 Alta</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+              Fecha Límite:
+            </label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                border: '1px solid #ddd',
+                borderRadius: '6px',
+                fontSize: '16px'
+              }}
+            />
+          </div>
+        </div>
         
-        <div style={{ marginBottom: '30px' }}>
+        <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
             Equipo: *
           </label>
@@ -145,6 +264,166 @@ const TaskForm: React.FC = () => {
             ))}
           </select>
         </div>
+
+     
+
+<div style={{ marginBottom: '30px' }}>
+  <label style={{ display: 'block', marginBottom: '12px', fontWeight: 'bold' }}>
+    🏷️ Etiquetas:
+  </label>
+  
+  {/* Etiquetas existentes */}
+  <div style={{ marginBottom: '15px' }}>
+    <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#666' }}>
+      Selecciona etiquetas existentes:
+    </p>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+      {etiquetas.map(etiqueta => (
+        <button
+          key={etiqueta.id}
+          type="button"
+          onClick={() => toggleEtiqueta(etiqueta.id)}
+          style={{
+            padding: '8px 12px',
+            backgroundColor: selectedEtiquetas.includes(etiqueta.id) ? etiqueta.color : '#f8f9fa',
+            color: selectedEtiquetas.includes(etiqueta.id) ? 'white' : '#333',
+            border: `2px solid ${etiqueta.color}`,
+            borderRadius: '20px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          {etiqueta.nombre}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  {/* Crear nueva etiqueta */}
+  <div>
+    <button
+      type="button"
+      onClick={() => setShowNewEtiqueta(!showNewEtiqueta)}
+      style={{
+        padding: '10px 16px',
+        backgroundColor: showNewEtiqueta ? '#6c757d' : '#17a2b8',
+        color: 'white',
+        border: 'none',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        marginBottom: '15px'
+      }}
+    >
+      {showNewEtiqueta ? '❌ Cancelar nueva etiqueta' : '➕ Crear Nueva Etiqueta'}
+    </button>
+
+    {showNewEtiqueta && (
+      <div style={{ 
+        marginTop: '15px', 
+        padding: '20px', 
+        backgroundColor: '#f8f9fa', 
+        borderRadius: '8px',
+        border: '2px dashed #dee2e6'
+      }}>
+        <h4 style={{ margin: '0 0 15px 0', color: '#333' }}>Crear Nueva Etiqueta</h4>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '15px', marginBottom: '15px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '14px' }}>
+              Nombre:
+            </label>
+            <input
+              type="text"
+              value={newEtiquetaNombre}
+              onChange={(e) => setNewEtiquetaNombre(e.target.value)}
+              placeholder="Nombre de la etiqueta"
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '14px' }}>
+              Color:
+            </label>
+            <input
+              type="color"
+              value={newEtiquetaColor}
+              onChange={(e) => setNewEtiquetaColor(e.target.value)}
+              style={{ 
+                width: '100%', 
+                height: '42px',
+                padding: '2px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            />
+          </div>
+        </div>
+        
+        {newEtiquetaNombre && (
+          <div style={{ 
+            padding: '10px',
+            backgroundColor: newEtiquetaColor,
+            color: 'white',
+            borderRadius: '4px',
+            textAlign: 'center',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            marginBottom: '15px'
+          }}>
+            Vista previa: {newEtiquetaNombre}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={async () => {
+            if (!newEtiquetaNombre.trim()) {
+              alert('Por favor ingresa un nombre para la etiqueta');
+              return;
+            }
+
+            try {
+              const nuevaEtiqueta = await etiquetaService.create(newEtiquetaNombre, newEtiquetaColor);
+              setEtiquetas(prev => [...prev, nuevaEtiqueta]);
+              setSelectedEtiquetas(prev => [...prev, nuevaEtiqueta.id]);
+              setNewEtiquetaNombre('');
+              setNewEtiquetaColor('#FF5733');
+              setShowNewEtiqueta(false);
+              alert('✅ Etiqueta creada exitosamente!');
+            } catch (err: any) {
+              alert('❌ Error al crear la etiqueta: ' + (err.response?.data?.message || 'Error desconocido'));
+              console.error('Error creating etiqueta:', err);
+            }
+          }}
+          disabled={!newEtiquetaNombre.trim()}
+          style={{
+            padding: '10px 16px',
+            backgroundColor: !newEtiquetaNombre.trim() ? '#6c757d' : '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: !newEtiquetaNombre.trim() ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          }}
+        >
+          ✅ Crear y Seleccionar Etiqueta
+        </button>
+      </div>
+    )}
+  </div>
+</div>
         
         <button 
           type="submit" 

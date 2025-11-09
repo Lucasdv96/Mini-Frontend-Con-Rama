@@ -1,28 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { Task, Team } from '../types';
+import { Task, Team, Etiqueta } from '../types';
 import { taskService } from '../services/taskService';
 import { teamService } from '../services/teamService';
+import { etiquetaService } from '../services/etiquetaService';
 import { useAuth } from '../contexts/AuthContext';
+import AsignarEtiquetasModal from './AsignarEtiquetasModal';
 
 const KanbanBoard: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
+  const [selectedEtiqueta, setSelectedEtiqueta] = useState<number | null>(null);
+  const [sortOrder, setSortOrder] = useState<'priority' | 'date'>('priority');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user } = useAuth();
+  const [showEtiquetasModal, setShowEtiquetasModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const estados = ['PENDIENTE', 'EN_CURSO', 'FINALIZADA', 'CANCELADA'];
 
   useEffect(() => {
     loadTeams();
+    loadEtiquetas();
     loadTasks();
   }, []);
 
   useEffect(() => {
-    filterTasksByTeam();
-  }, [tasks, selectedTeam]);
+    filterAndSortTasks();
+  }, [tasks, selectedTeam, selectedEtiqueta, sortOrder]);
 
   const loadTeams = async () => {
     if (!user) return;
@@ -31,12 +39,20 @@ const KanbanBoard: React.FC = () => {
       const myTeams = await teamService.getMyTeams(user.id);
       setTeams(myTeams);
       
-      // Seleccionar el primer equipo por defecto si hay equipos
       if (myTeams.length > 0) {
         setSelectedTeam(myTeams[0].id);
       }
     } catch (err: any) {
       console.error('Error loading teams:', err);
+    }
+  };
+
+  const loadEtiquetas = async () => {
+    try {
+      const etiquetasData = await etiquetaService.getAll();
+      setEtiquetas(etiquetasData);
+    } catch (err: any) {
+      console.error('Error loading etiquetas:', err);
     }
   };
 
@@ -55,13 +71,33 @@ const KanbanBoard: React.FC = () => {
     }
   };
 
-  const filterTasksByTeam = () => {
+  const filterAndSortTasks = () => {
+    let filtered = [...tasks];
+
+    // Filtrar por equipo
     if (selectedTeam) {
-      const filtered = tasks.filter(task => task.team.id === selectedTeam);
-      setFilteredTasks(filtered);
-    } else {
-      setFilteredTasks(tasks);
+      filtered = filtered.filter(task => task.team.id === selectedTeam);
     }
+
+    // Filtrar por etiqueta
+    if (selectedEtiqueta) {
+      filtered = filtered.filter(task => 
+        task.etiquetas?.some(etiqueta => etiqueta.id === selectedEtiqueta)
+      );
+    }
+
+    // Ordenar tareas
+    filtered = filtered.sort((a, b) => {
+      if (sortOrder === 'priority') {
+        const priorityOrder = { alta: 3, media: 2, baja: 1 };
+        return priorityOrder[b.priority] - priorityOrder[a.priority];
+      } else {
+        // Ordenar por fecha de creación (más reciente primero)
+        return new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime();
+      }
+    });
+
+    setFilteredTasks(filtered);
   };
 
   const handleStateChange = async (taskId: number, newState: string) => {
@@ -69,7 +105,7 @@ const KanbanBoard: React.FC = () => {
 
     try {
       await taskService.changeState(taskId, newState, user.id);
-      await loadTasks(); // Recargar las tareas después del cambio
+      await loadTasks();
     } catch (err: any) {
       console.error('Error changing task state:', err);
       alert('Error al cambiar el estado de la tarea');
@@ -100,10 +136,50 @@ const KanbanBoard: React.FC = () => {
     }
   };
 
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'alta': return '#dc3545';
+      case 'media': return '#ffc107';
+      case 'baja': return '#28a745';
+      default: return '#6c757d';
+    }
+  };
+
+  const getPriorityText = (priority: string) => {
+    switch (priority) {
+      case 'alta': return '🔴 Alta';
+      case 'media': return '🟡 Media';
+      case 'baja': return '🟢 Baja';
+      default: return priority;
+    }
+  };
+
+  const openEtiquetasModal = (task: Task) => {
+    setSelectedTask(task);
+    setShowEtiquetasModal(true);
+  };
+
+  const closeEtiquetasModal = () => {
+    setShowEtiquetasModal(false);
+    setSelectedTask(null);
+  };
+
+  const handleEtiquetasUpdated = (updatedTask: Task) => {
+    setTasks(prev => prev.map(task => 
+      task.id === updatedTask.id ? updatedTask : task
+    ));
+  };
+
   const getSelectedTeamName = () => {
     if (!selectedTeam) return 'Todos los equipos';
     const team = teams.find(t => t.id === selectedTeam);
     return team ? team.name : 'Equipo no encontrado';
+  };
+
+  const getSelectedEtiquetaName = () => {
+    if (!selectedEtiqueta) return 'Todas las etiquetas';
+    const etiqueta = etiquetas.find(e => e.id === selectedEtiqueta);
+    return etiqueta ? etiqueta.nombre : 'Etiqueta no encontrada';
   };
 
   if (loading) {
@@ -140,22 +216,22 @@ const KanbanBoard: React.FC = () => {
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
-        alignItems: 'center',
+        alignItems: 'flex-start',
         marginBottom: '30px',
         flexWrap: 'wrap',
-        gap: '15px'
+        gap: '20px'
       }}>
         <div>
           <h2 style={{ margin: 0 }}>Tablero Kanban</h2>
           <p style={{ margin: '5px 0 0 0', color: '#666' }}>
-            Mostrando: <strong>{getSelectedTeamName()}</strong>
+            Mostrando: <strong>{getSelectedTeamName()}</strong> | {getSelectedEtiquetaName()}
           </p>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
           {/* Selector de equipo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label style={{ fontWeight: 'bold', color: '#333' }}>Filtrar por equipo:</label>
+            <label style={{ fontWeight: 'bold', color: '#333', fontSize: '14px' }}>Equipo:</label>
             <select
               value={selectedTeam || ''}
               onChange={(e) => setSelectedTeam(e.target.value ? Number(e.target.value) : null)}
@@ -175,6 +251,51 @@ const KanbanBoard: React.FC = () => {
                   {team.name}
                 </option>
               ))}
+            </select>
+          </div>
+          
+          {/* Selector de etiqueta */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label style={{ fontWeight: 'bold', color: '#333', fontSize: '14px' }}>Etiqueta:</label>
+            <select
+              value={selectedEtiqueta || ''}
+              onChange={(e) => setSelectedEtiqueta(e.target.value ? Number(e.target.value) : null)}
+              style={{
+                padding: '10px 15px',
+                borderRadius: '6px',
+                border: '2px solid #28a745',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                minWidth: '200px',
+                fontSize: '14px'
+              }}
+            >
+              <option value="">Todas las etiquetas</option>
+              {etiquetas.map(etiqueta => (
+                <option key={etiqueta.id} value={etiqueta.id}>
+                  {etiqueta.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Selector de orden */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label style={{ fontWeight: 'bold', color: '#333', fontSize: '14px' }}>Ordenar por:</label>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'priority' | 'date')}
+              style={{
+                padding: '10px 15px',
+                borderRadius: '6px',
+                border: '2px solid #6c757d',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              <option value="priority">Prioridad</option>
+              <option value="date">Más reciente</option>
             </select>
           </div>
           
@@ -234,7 +355,7 @@ const KanbanBoard: React.FC = () => {
               padding: '15px', 
               backgroundColor: getEstadoColor(estado),
               borderRadius: '8px',
-              minHeight: '500px',
+              minHeight: '600px',
               border: `2px solid ${getEstadoBorderColor(estado)}`
             }}
           >
@@ -249,48 +370,115 @@ const KanbanBoard: React.FC = () => {
               {estado} ({getTasksByState(estado).length})
             </h3>
             
-            <div style={{ minHeight: '400px' }}>
+            <div style={{ minHeight: '500px' }}>
               {getTasksByState(estado).map(task => (
                 <div 
                   key={task.id}
                   style={{
                     backgroundColor: 'white',
                     padding: '15px',
-                    marginBottom: '10px',
+                    marginBottom: '15px',
                     borderRadius: '8px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    borderLeft: `4px solid ${getEstadoBorderColor(estado)}`
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    borderLeft: `4px solid ${getEstadoBorderColor(estado)}`,
+                    borderTop: `3px solid ${getPriorityColor(task.priority)}`
                   }}
                 >
-                  <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>{task.title}</h4>
-                  <p style={{ 
-                    margin: '0 0 10px 0', 
-                    fontSize: '14px', 
-                    color: '#666',
-                    lineHeight: '1.4'
-                  }}>
-                    {task.description}
-                  </p>
-                  
+                  {/* Header de la tarea */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <h4 style={{ 
+                      margin: 0, 
+                      color: '#333',
+                      fontSize: '16px',
+                      lineHeight: '1.3'
+                    }}>
+                      {task.title}
+                    </h4>
+                    <span style={{
+                      padding: '4px 8px',
+                      backgroundColor: getPriorityColor(task.priority),
+                      color: 'white',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {getPriorityText(task.priority)}
+                    </span>
+                  </div>
+
+                  {/* Descripción */}
+                  {task.description && (
+                    <p style={{ 
+                      margin: '0 0 10px 0', 
+                      fontSize: '13px', 
+                      color: '#666',
+                      lineHeight: '1.4'
+                    }}>
+                      {task.description}
+                    </p>
+                  )}
+
+                  {/* Fecha límite */}
+                  {task.dueDate && (
+                    <div style={{ 
+                      marginBottom: '10px',
+                      padding: '6px 10px',
+                      backgroundColor: '#fff3cd',
+                      borderRadius: '4px',
+                      border: '1px solid #ffeaa7'
+                    }}>
+                      <div style={{ 
+                        fontSize: '12px', 
+                        color: '#856404',
+                        fontWeight: 'bold'
+                      }}>
+                        📅 Vence: {new Date(task.dueDate).toLocaleDateString()}
+                        {new Date(task.dueDate) < new Date() && task.estado !== 'FINALIZADA' && (
+                          <span style={{ color: '#dc3545', marginLeft: '5px' }}>⚠️ Vencida</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Etiquetas */}
+                  {task.etiquetas && task.etiquetas.length > 0 && (
+                    <div style={{ 
+                      marginBottom: '12px', 
+                      display: 'flex', 
+                      flexWrap: 'wrap', 
+                      gap: '5px' 
+                    }}>
+                      {task.etiquetas.map(etiqueta => (
+                        <span
+                          key={etiqueta.id}
+                          style={{
+                            padding: '3px 8px',
+                            backgroundColor: etiqueta.color,
+                            color: 'white',
+                            borderRadius: '12px',
+                            fontSize: '10px',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          {etiqueta.nombre}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Información adicional */}
                   <div style={{ 
-                    fontSize: '12px', 
+                    fontSize: '11px', 
                     color: '#666', 
                     marginBottom: '12px',
                     padding: '8px',
                     backgroundColor: '#f8f9fa',
                     borderRadius: '4px'
                   }}>
-                    <div><strong>Equipo:</strong> {task.team.name}</div>
-                    <div><strong>Asignado a:</strong> {task.user.name}</div>
-                    <div><strong>Prioridad:</strong> 
-                      <span style={{ 
-                        color: task.priority === 'alta' ? '#dc3545' : 
-                               task.priority === 'media' ? '#ffc107' : '#28a745',
-                        marginLeft: '5px'
-                      }}>
-                        {task.priority}
-                      </span>
-                    </div>
+                    <div><strong>👥 Equipo:</strong> {task.team.name}</div>
+                    <div><strong>👤 Asignado por:</strong> {task.user.name}</div>
+                    <div><strong>📅 Creado:</strong> {new Date(task.fechaCreacion).toLocaleDateString()}</div>
                   </div>
 
                   {/* Selector de estado */}
@@ -303,7 +491,8 @@ const KanbanBoard: React.FC = () => {
                       borderRadius: '4px',
                       border: '1px solid #ddd',
                       backgroundColor: 'white',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      fontSize: '12px'
                     }}
                   >
                     {estados.map(estadoOption => (
@@ -312,8 +501,34 @@ const KanbanBoard: React.FC = () => {
                       </option>
                     ))}
                   </select>
+                  {/* Botón para asignar etiquetas */}
+                  <button
+                    onClick={() => openEtiquetasModal(task)}
+                    style={{
+                    width: '100%',
+                    padding: '6px',
+                    marginTop: '8px',
+                    backgroundColor: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 'bold'
+                    }}>
+                    🏷️ Gestionar Etiquetas
+                  </button>
                 </div>
               ))}
+              {/* Modal para asignar etiquetas */}
+{showEtiquetasModal && selectedTask && (
+  <AsignarEtiquetasModal
+    isOpen={showEtiquetasModal}
+    onClose={closeEtiquetasModal}
+    task={selectedTask}
+    onEtiquetasUpdated={handleEtiquetasUpdated}
+  />
+)}
               
               {getTasksByState(estado).length === 0 && (
                 <div style={{ 

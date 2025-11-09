@@ -6,22 +6,13 @@ export interface User {
   rol: "admin" | "user";
 }
 
-//export interface Team {
-//  id: number;
-//  name: string;
-//  description?: string;
-//  propietario: User;
-//  fechaCreacion: string;
- // memberships?: any[];
- // tasks?: Task[];
-//}
 export interface Team {
   id: number;
   name: string;
   description?: string;
   propietario: User;
   fechaCreacion: string;
-  memberships?: Membership[];  // ← Asegúrate de que esta propiedad esté definida
+  memberships?: Membership[];
   tasks?: Task[];
 }
 
@@ -30,7 +21,7 @@ export interface Task {
   title: string;
   description: string;
   estado: "PENDIENTE" | "EN_CURSO" | "FINALIZADA" | "CANCELADA";
-  priority: string;
+  priority: "alta" | "media" | "baja";
   dueDate?: string;
   user: User;
   team: Team;
@@ -83,4 +74,7 @@ export interface CreateTaskData {
   description: string;
   teamId: number;
   userId: number;
+  priority?: "alta" | "media" | "baja";
+  dueDate?: string;
+  etiquetasIds?: number[];
 }

@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Task } from '../types';
+import { Task, CreateTaskData } from '../types';
 
 export const taskService = {
   async getAll(userId: number): Promise<Task[]> {
@@ -7,12 +7,17 @@ export const taskService = {
     return response.data;
   },
 
-  async create(title: string, description: string, teamId: number, userId: number): Promise<Task> {
-    const response = await api.post('/tasks', { title, description, teamId, userId });
+  async create(taskData: CreateTaskData): Promise<Task> {
+    const response = await api.post('/tasks', taskData);
     return response.data;
   },
 
-  async update(id: number, userId: number, data: { title?: string; description?: string; priority?: string }): Promise<Task> {
+  async update(id: number, userId: number, data: { 
+    title?: string; 
+    description?: string; 
+    priority?: string;
+    dueDate?: string;
+  }): Promise<Task> {
     const response = await api.put(`/tasks/${id}`, { userId, ...data });
     return response.data;
   },

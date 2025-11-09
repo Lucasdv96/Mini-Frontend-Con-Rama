@@ -9,8 +9,9 @@ export const teamService = {
 
   async getMyTeams(userId: number): Promise<Team[]> {
     // Primero obtenemos todos los equipos
-    const allTeams = await this.getAll();
-    const myTeams: Team[] = [];
+     const response = await api.get('/teams?userid='+userId)
+    const allTeams = response.data;
+   /* const myTeams: Team[] = [];
     
     // Para cada equipo, verificamos si el usuario es miembro
     for (const team of allTeams) {
@@ -23,9 +24,9 @@ export const teamService = {
       } catch (error) {
         console.error(`Error verificando membresía en equipo ${team.id}:`, error);
       }
-    }
+    }*/
     
-    return myTeams;
+    return allTeams;
   },
 
   async getById(id: number): Promise<Team> {
