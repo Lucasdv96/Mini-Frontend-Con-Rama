@@ -5,6 +5,7 @@ import { teamService } from '../services/teamService';
 import { etiquetaService } from '../services/etiquetaService';
 import { useAuth } from '../contexts/AuthContext';
 import AsignarEtiquetasModal from './AsignarEtiquetasModal';
+import TaskDetailsModal from './TaskDetailsModal';
 
 const KanbanBoard: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -19,6 +20,8 @@ const KanbanBoard: React.FC = () => {
   const { user } = useAuth();
   const [showEtiquetasModal, setShowEtiquetasModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<Task | null>(null);
 
   const estados = ['PENDIENTE', 'EN_CURSO', 'FINALIZADA', 'CANCELADA'];
 
@@ -143,6 +146,22 @@ const KanbanBoard: React.FC = () => {
       case 'baja': return '#28a745';
       default: return '#6c757d';
     }
+  };
+
+  const openDetailsModal = (task: Task) => {
+  setSelectedTaskForDetails(task);
+  setShowDetailsModal(true);
+  };
+
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedTaskForDetails(null);
+  };
+
+  const handleTaskUpdated = (updatedTask: Task) => {
+    setTasks(prev => prev.map(task => 
+      task.id === updatedTask.id ? updatedTask : task
+    ));
   };
 
   const getPriorityText = (priority: string) => {
@@ -518,18 +537,42 @@ const KanbanBoard: React.FC = () => {
                     }}>
                     🏷️ Gestionar Etiquetas
                   </button>
+                  <button
+                  onClick={() => openDetailsModal(task)}
+                  style={{
+                    width: '100%',
+                    padding: '6px',
+                    marginTop: '8px',
+                    backgroundColor: '#17a2b8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  👁️ Ver Detalles
+                </button>
                 </div>
               ))}
               {/* Modal para asignar etiquetas */}
-{showEtiquetasModal && selectedTask && (
-  <AsignarEtiquetasModal
-    isOpen={showEtiquetasModal}
-    onClose={closeEtiquetasModal}
-    task={selectedTask}
-    onEtiquetasUpdated={handleEtiquetasUpdated}
-  />
-)}
-              
+              {showEtiquetasModal && selectedTask && (
+                <AsignarEtiquetasModal
+                  isOpen={showEtiquetasModal}
+                  onClose={closeEtiquetasModal}
+                  task={selectedTask}
+                  onEtiquetasUpdated={handleEtiquetasUpdated}
+                />
+              )}   
+              {showDetailsModal && selectedTaskForDetails && (
+              <TaskDetailsModal
+                isOpen={showDetailsModal}
+                onClose={closeDetailsModal}
+                task={selectedTaskForDetails}
+                onTaskUpdated={handleTaskUpdated}
+              />
+            )}    
               {getTasksByState(estado).length === 0 && (
                 <div style={{ 
                   textAlign: 'center', 

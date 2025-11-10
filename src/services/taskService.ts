@@ -39,5 +39,15 @@ export const taskService = {
   async getByState(equipoId: number, estado: string): Promise<Task[]> {
     const response = await api.get(`/equipos/${equipoId}/tareas/${estado}`);
     return response.data;
-  }
+  },
+  
+  async getTaskById(taskId: number): Promise<Task> {
+  // Necesitarás crear este endpoint en el backend si no existe
+  // Por ahora, podemos obtenerlo de la lista de tareas
+  const allTasks = await this.getAll(1); // userId temporal
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) throw new Error("Tarea no encontrada");
+  return task;
+}
+
 };

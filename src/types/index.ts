@@ -30,6 +30,14 @@ export interface Task {
   historialEstados?: HistorialEstado[];
 }
 
+export interface Comment {
+  id: number;
+  contenido: string;
+  usuario: User;
+  tarea: Task;
+  fechaCreacion: string;
+}
+
 export interface Etiqueta {
   id: number;
   nombre: string;
